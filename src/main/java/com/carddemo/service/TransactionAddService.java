@@ -3,10 +3,6 @@ package com.carddemo.service;
 import com.carddemo.model.CardXref;
 import com.carddemo.model.Transaction;
 import com.carddemo.repository.CardXrefRepository;
-import com.carddemo.repository.TransactionRepository;
-import jakarta.persistence.EntityExistsException;
-import jakarta.persistence.EntityManager;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,23 +33,17 @@ public class TransactionAddService {
     static final String MSG_MERCHANT_ID_NOT_NUMERIC = "Merchant ID must be Numeric...";
     static final String MSG_CONFIRM = "Confirm to add this transaction...";
     static final String MSG_CONFIRM_INVALID = "Invalid value. Valid values are (Y/N)...";
-    static final String MSG_DUPLICATE = "Tran ID already exist...";
     static final String MSG_UNABLE_TO_ADD = "Unable to Add Transaction...";
-
-    private static final long MAX_TRAN_ID = 9_999_999_999_999_999L;
 
     private static final Pattern AMOUNT = Pattern.compile("[+-]\\d{8}\\.\\d{2}");
     private static final Pattern DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
     private final CardXrefRepository cardXrefs;
-    private final TransactionRepository transactions;
-    private final EntityManager entityManager;
+    private final TransactionWriter writer;
 
-    public TransactionAddService(CardXrefRepository cardXrefs, TransactionRepository transactions,
-                                 EntityManager entityManager) {
+    public TransactionAddService(CardXrefRepository cardXrefs, TransactionWriter writer) {
         this.cardXrefs = cardXrefs;
-        this.transactions = transactions;
-        this.entityManager = entityManager;
+        this.writer = writer;
     }
 
     /** PROCESS-ENTER-KEY: key fields, then data fields, then the Y/N confirmation, then ADD-TRANSACTION. */
@@ -63,16 +53,9 @@ public class TransactionAddService {
         Transaction t = validateDataFields(in);
         validateConfirm(in.confirm());
 
-        t.setId(nextTransactionId());
         t.setCardNumber(cardNumber);
-        try {
-            entityManager.persist(t);
-            entityManager.flush();
-        } catch (EntityExistsException | ConstraintViolationException e) {
-            throw new DuplicateTransactionIdException(MSG_DUPLICATE);
-        }
-        return new NewTransactionResult(t.getId(),
-                "Transaction added successfully.  Your Tran ID is " + t.getId() + ".");
+        String id = writer.insertWithNextId(t, MSG_UNABLE_TO_ADD);
+        return new NewTransactionResult(id, "Transaction added successfully.  Your Tran ID is " + id + ".");
     }
 
     /**
@@ -167,19 +150,6 @@ public class TransactionAddService {
         }
     }
 
-    /** ADD-TRANSACTION: READPREV from HIGH-VALUES finds the highest id (ZEROS if the file is empty), then add 1. */
-    private String nextTransactionId() {
-        long highest = transactions.findTopByOrderByIdDesc()
-                .map(t -> Long.parseLong(t.getId()))
-                .orElse(0L);
-        // COBOL's ADD 1 would silently wrap a full PIC 9(16) to zeros; refuse instead.
-        if (highest >= MAX_TRAN_ID) {
-            throw new TransactionIdsExhaustedException(MSG_UNABLE_TO_ADD);
-        }
-        return zeroPad(Long.toString(highest + 1), 16);
-    }
-
-    /** Rejects blank input; keeps leading spaces (they are part of a text field), drops trailing padding. */
     private static String required(String raw, String label) {
         String value = raw == null ? "" : raw.stripTrailing();
         if (value.isBlank()) {

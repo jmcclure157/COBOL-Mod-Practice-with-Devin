@@ -2,6 +2,7 @@ package com.carddemo.controller;
 
 import com.carddemo.service.AccountNotFoundException;
 import com.carddemo.service.InvalidAccountIdException;
+import com.carddemo.service.BillPaymentRejectedException;
 import com.carddemo.service.CardOrAccountNotFoundException;
 import com.carddemo.service.DuplicateTransactionIdException;
 import com.carddemo.service.InvalidNewTransactionException;
@@ -51,6 +52,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(CardOrAccountNotFoundException.class)
     public ProblemDetail cardOrAccountNotFound(CardOrAccountNotFoundException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(BillPaymentRejectedException.class)
+    public ProblemDetail billPaymentRejected(BillPaymentRejectedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     @ExceptionHandler(TransactionIdsExhaustedException.class)
