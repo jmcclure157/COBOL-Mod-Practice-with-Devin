@@ -122,6 +122,24 @@ Like the COBOL screen:
 
 The app's database lives in memory, so added transactions disappear when it restarts.
 
+### Fifth migrated flow: bill payment (`COBIL00C` → `POST /accounts/{id}/payments`)
+
+```bash
+curl -i -X POST http://localhost:8080/accounts/2/payments -H 'Content-Type: application/json' -d '{"confirm": "Y"}'
+# 201 Created, Location: /transactions/0000000996722788
+# {"transactionId":"0000000996722788","amountPaid":158.00,"newBalance":0.00,
+#  "message":"Payment successful.  Your Transaction ID is 0000000996722788."}
+```
+
+Like the COBOL screen:
+- It always pays the **whole** current balance. It writes a payment transaction (type `02`, category `2`,
+  `BILL PAYMENT - ONLINE`, merchant `999999999`, the account's card) and sets the balance to zero.
+- Both changes run in one `@Transactional` method, so either both are saved or neither is. The account is read
+  with a database lock, like the COBOL `READ ... UPDATE`, so two payments can't pay the same balance twice.
+- `confirm` must be `Y`. `N`, blank or no body returns `"Confirm to make a bill payment..."`; anything else returns
+  `"Invalid value. Valid values are (Y/N)..."`.
+- A balance of zero or less returns `"You have nothing to pay..."`, and an unknown account `"Account ID NOT found..."` (404).
+
 H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC URL `jdbc:h2:mem:carddemo`, user `sa`, no password.
 
 ## Recommended migration order
@@ -133,7 +151,7 @@ Each step reuses what the previous one built, and gets slightly harder:
    (COBOL `STARTBR`/`READNEXT`/`READPREV` browse → Spring Data `Slice`).
 3. **Transaction add – `COTRN02C`** ✅ done → `POST /transactions`. First write: input validation, cross-reference lookup,
    generating the next transaction id.
-4. **Bill payment – `COBIL00C`** → `POST /accounts/{id}/payments`. Updates two records (writes a transaction and
+4. **Bill payment – `COBIL00C`** ✅ done → `POST /accounts/{id}/payments`. Updates two records (writes a transaction and
    reduces the account balance) that must succeed or fail together → `@Transactional`.
 5. **Batch posting job – `CBTRN02C` (`POSTTRAN.jcl`)** → Spring Batch job. Reads `dailytran.txt`, validates each
    record, posts to `TRANSACT`, updates account and category balances, writes rejects. First batch migration.
