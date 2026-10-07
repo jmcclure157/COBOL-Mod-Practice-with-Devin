@@ -143,8 +143,9 @@ Like the COBOL screen:
 
 ### Sixth migrated flow: nightly posting job (`CBTRN02C` / `POSTTRAN.jcl` → Spring Batch `postTransactionsJob`)
 
-There is no URL: it runs once at startup, after the data files are loaded (`PostTransactionsAtStartup`). The log shows
-the COBOL's closing counts:
+There is no URL: it runs once at startup, after the data files are loaded and before the web server starts taking
+requests (`PostTransactionsAtStartup`, like the mainframe's batch window when the online side is down). It is skipped
+when `TRANSACT` already has rows. The log shows the COBOL's closing counts:
 
 ```text
 TRANSACTIONS PROCESSED :300

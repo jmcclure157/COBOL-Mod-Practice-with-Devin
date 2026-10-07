@@ -23,10 +23,8 @@ import com.carddemo.repository.TransactionTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.annotation.Order;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
@@ -46,9 +44,13 @@ import java.util.function.Function;
  * the POSTTRAN job ({@code PostTransactionsAtStartup}) fills it from dailytran.txt afterwards.
  */
 @Component
-@Order(1)
 @ConditionalOnProperty(name = "carddemo.seed.enabled", havingValue = "true", matchIfMissing = true)
-public class CardDemoDataLoader implements ApplicationRunner {
+public class CardDemoDataLoader implements SmartLifecycle {
+
+    /** Lifecycle phase: before the posting job, and well before the web server starts taking requests. */
+    public static final int PHASE = 0;
+
+    private volatile boolean running;
 
     private static final Logger log = LoggerFactory.getLogger(CardDemoDataLoader.class);
 
@@ -86,7 +88,22 @@ public class CardDemoDataLoader implements ApplicationRunner {
     }
 
     @Override
-    public void run(ApplicationArguments args) {
+    public int getPhase() {
+        return PHASE;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
+    @Override
+    public void stop() {
+        running = false;
+    }
+
+    @Override
+    public void start() {
         load("acctdata.txt", accounts, CardDemoDataLoader::parseAccount);
         load("custdata.txt", customers, CardDemoDataLoader::parseCustomer);
         load("carddata.txt", cards, CardDemoDataLoader::parseCard);
@@ -95,6 +112,7 @@ public class CardDemoDataLoader implements ApplicationRunner {
         load("trancatg.txt", transactionCategories, CardDemoDataLoader::parseTransactionCategory);
         load("discgrp.txt", disclosureGroups, CardDemoDataLoader::parseDisclosureGroup);
         load("tcatbal.txt", categoryBalances, CardDemoDataLoader::parseCategoryBalance);
+        running = true;
     }
 
     private <T> void load(String fileName, JpaRepository<T, ?> repository, Function<String, T> parser) {

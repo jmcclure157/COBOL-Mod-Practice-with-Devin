@@ -32,6 +32,7 @@ class PostTransactionsJobTest {
     @Autowired Job postTransactionsJob;
     @Autowired TransactionRepository transactions;
     @Autowired CardXrefRepository cardXrefs;
+    @Autowired PostTransactionsAtStartup startup;
 
     @TempDir Path dir;
 
@@ -68,6 +69,15 @@ class PostTransactionsJobTest {
         assertThat(rejects.get(0)).hasSize(430);
         assertThat(rejects.get(0).substring(0, 350)).isEqualTo(badCard);
         assertThat(rejects.get(0).substring(350).stripTrailing()).isEqualTo("0100INVALID CARD NUMBER FOUND");
+    }
+
+    @Test
+    void startupDoesNotPostTheSameDailyFileTwice() {
+        long before = transactions.count();
+
+        startup.start();
+
+        assertThat(transactions.count()).isEqualTo(before);
     }
 
     @Test
