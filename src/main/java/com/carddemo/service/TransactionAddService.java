@@ -38,6 +38,9 @@ public class TransactionAddService {
     static final String MSG_CONFIRM = "Confirm to add this transaction...";
     static final String MSG_CONFIRM_INVALID = "Invalid value. Valid values are (Y/N)...";
     static final String MSG_DUPLICATE = "Tran ID already exist...";
+    static final String MSG_UNABLE_TO_ADD = "Unable to Add Transaction...";
+
+    private static final long MAX_TRAN_ID = 9_999_999_999_999_999L;
 
     private static final Pattern AMOUNT = Pattern.compile("[+-]\\d{8}\\.\\d{2}");
     private static final Pattern DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
@@ -100,14 +103,14 @@ public class TransactionAddService {
 
     /** VALIDATE-INPUT-DATA-FIELDS, in the COBOL order: required fields, numeric codes, formats, real dates. */
     private Transaction validateDataFields(NewTransactionRequest in) {
-        String typeCode = required(in.typeCode(), "Type CD");
-        String categoryCode = required(in.categoryCode(), "Category CD");
+        String typeCode = required(in.typeCode(), "Type CD").strip();
+        String categoryCode = required(in.categoryCode(), "Category CD").strip();
         String source = required(in.source(), "Source");
         String description = required(in.description(), "Description");
-        String amount = required(in.amount(), "Amount");
-        String originDate = required(in.originDate(), "Orig Date");
-        String processedDate = required(in.processedDate(), "Proc Date");
-        String merchantId = required(in.merchantId(), "Merchant ID");
+        String amount = required(in.amount(), "Amount").strip();
+        String originDate = required(in.originDate(), "Orig Date").strip();
+        String processedDate = required(in.processedDate(), "Proc Date").strip();
+        String merchantId = required(in.merchantId(), "Merchant ID").strip();
         String merchantName = required(in.merchantName(), "Merchant Name");
         String merchantCity = required(in.merchantCity(), "Merchant City");
         String merchantZip = required(in.merchantZip(), "Merchant Zip");
@@ -169,12 +172,17 @@ public class TransactionAddService {
         long highest = transactions.findTopByOrderByIdDesc()
                 .map(t -> Long.parseLong(t.getId()))
                 .orElse(0L);
+        // COBOL's ADD 1 would silently wrap a full PIC 9(16) to zeros; refuse instead.
+        if (highest >= MAX_TRAN_ID) {
+            throw new TransactionIdsExhaustedException(MSG_UNABLE_TO_ADD);
+        }
         return zeroPad(Long.toString(highest + 1), 16);
     }
 
+    /** Rejects blank input; keeps leading spaces (they are part of a text field), drops trailing padding. */
     private static String required(String raw, String label) {
-        String value = text(raw);
-        if (value.isEmpty()) {
+        String value = raw == null ? "" : raw.stripTrailing();
+        if (value.isBlank()) {
             throw new InvalidNewTransactionException(label + " can NOT be empty...");
         }
         return value;

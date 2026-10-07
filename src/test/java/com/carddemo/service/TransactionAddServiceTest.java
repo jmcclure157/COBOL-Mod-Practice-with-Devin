@@ -1,8 +1,10 @@
 package com.carddemo.service;
 
+import com.carddemo.model.Transaction;
 import com.carddemo.repository.TransactionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,7 @@ class TransactionAddServiceTest {
 
     @Autowired TransactionAddService service;
     @Autowired TransactionRepository transactions;
+    @Autowired EntityManager entityManager;
 
     static NewTransactionRequest valid() {
         return new NewTransactionRequest("50", null, "01", "0001", "POS TERM", "Purchase at Test Store",
@@ -157,5 +160,22 @@ class TransactionAddServiceTest {
                 field.equals("merchantCity") ? value : r.merchantCity(),
                 field.equals("merchantZip") ? value : r.merchantZip(),
                 field.equals("confirm") ? value : r.confirm());
+    }
+
+    @Test
+    void leadingSpacesInTextFieldsAreKeptAndNumbersAreTrimmed() {
+        var request = copy(copy(valid(), "description", "  Refund  "), "amount", " +00000001.00 ");
+        String id = service.addTransaction(request).transactionId();
+        var saved = transactions.findById(id).orElseThrow();
+        assertThat(saved.getDescription()).isEqualTo("  Refund");
+        assertThat(saved.getAmount()).isEqualByComparingTo("1.00");
+    }
+
+    @Test
+    void refusesToAddOnceTheHighest16DigitIdIsTaken() {
+        var full = new Transaction();
+        full.setId("9999999999999999");
+        entityManager.persist(full);
+        rejected(valid(), TransactionIdsExhaustedException.class, TransactionAddService.MSG_UNABLE_TO_ADD);
     }
 }
