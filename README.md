@@ -101,6 +101,27 @@ curl "http://localhost:8080/transactions/%20"              # 400: "Tran ID can N
 Like the COBOL screen, the ID is looked up exactly as typed (no zero-padding), and the two timestamps are shown as
 dates. The COBOL `READ ... UPDATE` lock is dropped: the screen never updates the record.
 
+### Fourth migrated flow: add a transaction (`COTRN02C` → `POST /transactions`)
+
+```bash
+curl -i -X POST http://localhost:8080/transactions -H 'Content-Type: application/json' -d '{
+  "accountId": "50", "typeCode": "01", "categoryCode": "0001", "source": "POS TERM",
+  "description": "Purchase at Test Store", "amount": "+00000123.45",
+  "originDate": "2026-10-07", "processedDate": "2026-10-07", "merchantId": "800000000",
+  "merchantName": "Test Store", "merchantCity": "Dallas", "merchantZip": "75201", "confirm": "Y"}'
+# 201 Created, Location: /transactions/0000000996722788
+# {"transactionId":"0000000996722788","message":"Transaction added successfully.  Your Tran ID is 0000000996722788."}
+```
+
+Like the COBOL screen:
+- Give an `accountId` *or* a `cardNumber`. An account is looked up in the cross-reference to find its card, and an account wins if both are sent.
+- Every field is required, and the edits run in the screen's order, stopping at the first failure. Each failure returns the COBOL message, for example `"Amount should be in format -99999999.99"` or `"Orig Date - Not a valid date..."`.
+- `confirm` must be `Y`. `N` or blank returns `"Confirm to add this transaction..."`, because the screen asked before saving.
+- The new id is the highest existing id + 1 (`READPREV` from `HIGH-VALUES`).
+- Unknown account or card returns 404, a duplicate id returns 409, and every other failed edit returns 400.
+
+The app's database lives in memory, so added transactions disappear when it restarts.
+
 H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC URL `jdbc:h2:mem:carddemo`, user `sa`, no password.
 
 ## Recommended migration order
@@ -110,7 +131,7 @@ Each step reuses what the previous one built, and gets slightly harder:
 1. **Account view – `COACTVWC`** ✅ done. Read-only, three file reads, no updates. Introduces entities, seeding, REST.
 2. **Transaction list – `COTRN00C`** ✅ done → `GET /transactions?startId=&page=` (plus `COTRN01C` view ✅ → `GET /transactions/{id}`). Read-only, but adds paging
    (COBOL `STARTBR`/`READNEXT`/`READPREV` browse → Spring Data `Slice`).
-3. **Transaction add – `COTRN02C`** → `POST /transactions`. First write: input validation, cross-reference lookup,
+3. **Transaction add – `COTRN02C`** ✅ done → `POST /transactions`. First write: input validation, cross-reference lookup,
    generating the next transaction id.
 4. **Bill payment – `COBIL00C`** → `POST /accounts/{id}/payments`. Updates two records (writes a transaction and
    reduces the account balance) that must succeed or fail together → `@Transactional`.

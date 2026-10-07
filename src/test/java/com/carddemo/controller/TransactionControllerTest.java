@@ -4,9 +4,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -87,5 +91,42 @@ class TransactionControllerTest {
         mvc.perform(get("/transactions/{id}", " "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Tran ID can NOT be empty..."));
+    }
+
+    private static final String NEW_TRANSACTION = """
+            {"accountId": "50", "typeCode": "01", "categoryCode": "0001", "source": "POS TERM",
+             "description": "Purchase at Test Store", "amount": "+00000123.45",
+             "originDate": "2026-10-07", "processedDate": "2026-10-07", "merchantId": "800000000",
+             "merchantName": "Test Store", "merchantCity": "Dallas", "merchantZip": "75201", "confirm": "Y"}
+            """;
+
+    @Test
+    @Transactional
+    void addTransactionIs201WithLocationAndCobolSuccessMessage() throws Exception {
+        mvc.perform(post("/transactions").contentType(MediaType.APPLICATION_JSON).content(NEW_TRANSACTION))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/transactions/0000000996722788"))
+                .andExpect(jsonPath("$.transactionId").value("0000000996722788"))
+                .andExpect(jsonPath("$.message")
+                        .value("Transaction added successfully.  Your Tran ID is 0000000996722788."));
+
+        mvc.perform(get("/transactions/{id}", "0000000996722788"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cardNumber").value("0500024453765740"))
+                .andExpect(jsonPath("$.amount").value(123.45));
+    }
+
+    @Test
+    @Transactional
+    void addTransactionValidationIs400AndUnknownAccountIs404() throws Exception {
+        mvc.perform(post("/transactions").contentType(MediaType.APPLICATION_JSON)
+                        .content(NEW_TRANSACTION.replace("\"+00000123.45\"", "\"123.45\"")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Amount should be in format -99999999.99"));
+
+        mvc.perform(post("/transactions").contentType(MediaType.APPLICATION_JSON)
+                        .content(NEW_TRANSACTION.replace("\"50\"", "\"99999\"")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Account ID NOT found..."));
     }
 }
