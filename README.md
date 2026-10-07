@@ -50,11 +50,12 @@ Key design notes:
   `}`/`J`–`R` = negative). The files are packaged as `classpath:carddemo-data/` straight from
   `carddemo/app/data/ASCII`, so there is a single copy of the data.
 - **H2 in-memory database**, recreated on each start. Switch `spring.datasource.*` to PostgreSQL later if you want.
-- Seeded today: accounts, customers, cards, card cross-references, transaction types/categories,
-  disclosure groups, category balances, and transactions.
-- **Transactions are a stand-in.** On the mainframe `TRANSACT` (posted transactions) starts empty and is filled by
-  the batch posting job (`CBTRN02C`) from `dailytran.txt`. Until that job is migrated, the loader copies all 300
-  `dailytran.txt` records straight into `TRANSACT` (same record layout, no posting validations).
+- Seeded from the files: accounts, customers, cards, card cross-references, transaction types/categories,
+  disclosure groups and category balances.
+- **Transactions are posted, not seeded.** Like on the mainframe, `TRANSACT` starts empty. Right after seeding, the
+  app runs the migrated posting job (`CBTRN02C`) once on `dailytran.txt`: 262 records are posted (and update the
+  account and category balances) and 38 are rejected as `OVERLIMIT TRANSACTION`. So account 1 shows 1288.10, not
+  the 194.00 in `acctdata.txt`.
 
 ## Build and run
 
@@ -127,7 +128,7 @@ The app's database lives in memory, so added transactions disappear when it rest
 ```bash
 curl -i -X POST http://localhost:8080/accounts/2/payments -H 'Content-Type: application/json' -d '{"confirm": "Y"}'
 # 201 Created, Location: /transactions/0000000996722788
-# {"transactionId":"0000000996722788","amountPaid":158.00,"newBalance":0.00,
+# {"transactionId":"0000000996722788","amountPaid":1734.97,"newBalance":0.00,
 #  "message":"Payment successful.  Your Transaction ID is 0000000996722788."}
 ```
 
@@ -139,6 +140,33 @@ Like the COBOL screen:
 - `confirm` must be `Y`. `N`, blank or no body returns `"Confirm to make a bill payment..."`; anything else returns
   `"Invalid value. Valid values are (Y/N)..."`.
 - A balance of zero or less returns `"You have nothing to pay..."`, and an unknown account `"Account ID NOT found..."` (404).
+
+### Sixth migrated flow: nightly posting job (`CBTRN02C` / `POSTTRAN.jcl` → Spring Batch `postTransactionsJob`)
+
+There is no URL: it runs once at startup, after the data files are loaded (`PostTransactionsAtStartup`). The log shows
+the COBOL's closing counts:
+
+```text
+TRANSACTIONS PROCESSED :300
+TRANSACTIONS REJECTED  :38
+```
+
+Like the COBOL program, for each `dailytran.txt` record in file order:
+- Checks, in order: card in the cross-reference (`100 INVALID CARD NUMBER FOUND`), account exists
+  (`101 ACCOUNT RECORD NOT FOUND`), cycle credit − cycle debit + amount within the credit limit
+  (`102 OVERLIMIT TRANSACTION`), received on or before the account's expiry date
+  (`103 TRANSACTION RECEIVED AFTER ACCT EXPIRATION`). Both 102 and 103 are checked; if both fail, 103 is kept.
+- A good record: adds the amount to its category balance (creating that row if missing), adds it to the account
+  balance and to the cycle credit (amount ≥ 0) or cycle debit (amount < 0), and is written to `TRANSACT` with its own
+  id and a processed timestamp in the COBOL's DB2 format (`2026-10-07-14.28.36.460000`).
+- A bad record goes to the rejects file, `target/dalyrejs.txt` (`carddemo.posting.rejects-file`): the original
+  350-byte record + 4-digit reason + 76-character description, 430 bytes like the `DALYREJS` dataset.
+- Any rejects end the job as `COMPLETED WITH REJECTS` (the COBOL's return code 4). A file error, such as a
+  duplicate transaction id, fails the job and stops the app from starting (the COBOL abends).
+
+Spring Batch pieces: `FlatFileItemReader` (DALYTRAN) → parse → `PostingItemWriter`, which calls
+`TransactionPostingService` for each record and writes rejects with a `FlatFileItemWriter` (DALYREJS). The job
+parameters `dailyFile` and `rejectsFile` take the place of the JCL `DD` statements.
 
 H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC URL `jdbc:h2:mem:carddemo`, user `sa`, no password.
 
@@ -153,7 +181,7 @@ Each step reuses what the previous one built, and gets slightly harder:
    generating the next transaction id.
 4. **Bill payment – `COBIL00C`** ✅ done → `POST /accounts/{id}/payments`. Updates two records (writes a transaction and
    reduces the account balance) that must succeed or fail together → `@Transactional`.
-5. **Batch posting job – `CBTRN02C` (`POSTTRAN.jcl`)** → Spring Batch job. Reads `dailytran.txt`, validates each
+5. **Batch posting job – `CBTRN02C` (`POSTTRAN.jcl`)** ✅ done → Spring Batch `postTransactionsJob`, run at startup. Reads `dailytran.txt`, validates each
    record, posts to `TRANSACT`, updates account and category balances, writes rejects. First batch migration.
 
 After that, good candidates are the other read-only screens (`COCRDLIC`, `COCRDSLC`, `COUSR00C`), then the

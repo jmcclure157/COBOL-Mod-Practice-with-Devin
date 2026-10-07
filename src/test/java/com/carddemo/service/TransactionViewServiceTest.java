@@ -24,7 +24,7 @@ class TransactionViewServiceTest {
         assertThat(view.amount()).isEqualByComparingTo("504.77");
         assertThat(view.description()).isEqualTo("Purchase at Abshire-Lowe");
         assertThat(view.originDate()).hasToString("2022-06-10");
-        assertThat(view.processedDate()).isNull();
+        assertThat(view.processedDate()).isNotNull();
         assertThat(view.merchantId()).isEqualTo(800000000L);
         assertThat(view.merchantName()).isEqualTo("Abshire-Lowe");
         assertThat(view.merchantCity()).isEqualTo("North Enoshaven");

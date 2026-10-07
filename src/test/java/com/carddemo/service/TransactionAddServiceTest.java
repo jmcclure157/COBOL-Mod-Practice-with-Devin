@@ -46,7 +46,7 @@ class TransactionAddServiceTest {
         assertThat(saved.getAmount()).isEqualByComparingTo("123.45");
         assertThat(saved.getOriginTimestamp()).isEqualTo("2026-10-07");
         assertThat(saved.getMerchantId()).isEqualTo(800000000L);
-        assertThat(transactions.count()).isEqualTo(301);
+        assertThat(transactions.count()).isEqualTo(263);
 
         assertThat(service.addTransaction(valid()).transactionId()).isEqualTo("0000000996722789");
     }
@@ -137,7 +137,7 @@ class TransactionAddServiceTest {
         }
         rejected(copy(valid(), "confirm", "X"), InvalidNewTransactionException.class,
                 TransactionAddService.MSG_CONFIRM_INVALID);
-        assertThat(transactions.count()).isEqualTo(300);
+        assertThat(transactions.count()).isEqualTo(262);
     }
 
     private static NewTransactionRequest with(UnaryOperator<NewTransactionRequest> change) {

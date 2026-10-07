@@ -19,7 +19,6 @@ import com.carddemo.repository.CustomerRepository;
 import com.carddemo.repository.DisclosureGroupRepository;
 import com.carddemo.repository.TransactionCategoryBalanceRepository;
 import com.carddemo.repository.TransactionCategoryRepository;
-import com.carddemo.repository.TransactionRepository;
 import com.carddemo.repository.TransactionTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +26,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
@@ -42,9 +42,11 @@ import java.util.function.Function;
 /**
  * Seeds the database from the original CardDemo ASCII sample files (carddemo/app/data/ASCII),
  * the same files the IDCAMS REPRO jobs (ACCTFILE, CUSTFILE, CARDFILE, XREFFILE, ...) load into VSAM.
- * Each parse method follows its copybook field by field.
+ * Each parse method follows its copybook field by field. TRANSACT is not loaded here: like on the mainframe,
+ * the POSTTRAN job ({@code PostTransactionsAtStartup}) fills it from dailytran.txt afterwards.
  */
 @Component
+@Order(1)
 @ConditionalOnProperty(name = "carddemo.seed.enabled", havingValue = "true", matchIfMissing = true)
 public class CardDemoDataLoader implements ApplicationRunner {
 
@@ -60,7 +62,6 @@ public class CardDemoDataLoader implements ApplicationRunner {
     private final TransactionCategoryRepository transactionCategories;
     private final DisclosureGroupRepository disclosureGroups;
     private final TransactionCategoryBalanceRepository categoryBalances;
-    private final TransactionRepository transactions;
 
     public CardDemoDataLoader(ResourceLoader resourceLoader,
                               @Value("${carddemo.seed.location:classpath:carddemo-data/}") String location,
@@ -71,8 +72,7 @@ public class CardDemoDataLoader implements ApplicationRunner {
                               TransactionTypeRepository transactionTypes,
                               TransactionCategoryRepository transactionCategories,
                               DisclosureGroupRepository disclosureGroups,
-                              TransactionCategoryBalanceRepository categoryBalances,
-                              TransactionRepository transactions) {
+                              TransactionCategoryBalanceRepository categoryBalances) {
         this.resourceLoader = resourceLoader;
         this.location = location;
         this.accounts = accounts;
@@ -83,7 +83,6 @@ public class CardDemoDataLoader implements ApplicationRunner {
         this.transactionCategories = transactionCategories;
         this.disclosureGroups = disclosureGroups;
         this.categoryBalances = categoryBalances;
-        this.transactions = transactions;
     }
 
     @Override
@@ -96,9 +95,6 @@ public class CardDemoDataLoader implements ApplicationRunner {
         load("trancatg.txt", transactionCategories, CardDemoDataLoader::parseTransactionCategory);
         load("discgrp.txt", disclosureGroups, CardDemoDataLoader::parseDisclosureGroup);
         load("tcatbal.txt", categoryBalances, CardDemoDataLoader::parseCategoryBalance);
-        // Stand-in for the POSTTRAN batch job (CBTRN02C), which normally copies DALYTRAN into TRANSACT.
-        // Every daily record is loaded as-is; the job's validations arrive when CBTRN02C is migrated.
-        load("dailytran.txt", transactions, CardDemoDataLoader::parseTransaction);
     }
 
     private <T> void load(String fileName, JpaRepository<T, ?> repository, Function<String, T> parser) {
@@ -231,7 +227,7 @@ public class CardDemoDataLoader implements ApplicationRunner {
     }
 
     /** CVTRA05Y TRAN-RECORD (CVTRA06Y DALYTRAN-RECORD has the same layout). */
-    static Transaction parseTransaction(String line) {
+    public static Transaction parseTransaction(String line) {
         var r = new CopybookReader(line);
         var t = new Transaction();
         t.setId(r.text(16));                             // TRAN-ID            PIC X(16)

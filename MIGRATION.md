@@ -15,7 +15,7 @@ VSAM files (keyed mainframe files) become tables. Entities live in `src/main/jav
 | `CUSTDAT` | `CVCUS01Y` `CUSTOMER-RECORD` (500 B) | `custdata.txt` (50) | `Customer` | ✅ |
 | `CARDDAT` | `CVACT02Y` `CARD-RECORD` (150 B) | `carddata.txt` (50) | `Card` | ✅ |
 | `CARDXREF` / `CXACAIX` (alt. index by account) | `CVACT03Y` `CARD-XREF-RECORD` (50 B) | `cardxref.txt` (50) | `CardXref` | ✅ |
-| `TRANSACT` | `CVTRA05Y` `TRAN-RECORD` (350 B) | — (written by `CBTRN02C`); seeded from `dailytran.txt` until that job is migrated | `Transaction` | ✅ |
+| `TRANSACT` | `CVTRA05Y` `TRAN-RECORD` (350 B) | — (written by `CBTRN02C`, which runs on `dailytran.txt` at startup) | `Transaction` | ✅ |
 | `DALYTRAN` (sequential input) | `CVTRA06Y` `DALYTRAN-RECORD` | `dailytran.txt` (300) | — (batch input, see `CBTRN02C`) | — |
 | `TRANTYPE` | `CVTRA03Y` `TRAN-TYPE-RECORD` | `trantype.txt` (7) | `TransactionType` | ✅ |
 | `TRANCATG` | `CVTRA04Y` `TRAN-CAT-RECORD` | `trancatg.txt` (18) | `TransactionCategory` | ✅ |
@@ -64,7 +64,7 @@ JCL in `carddemo/app/jcl/`.
 | `CBCUS01C` | `READCUST` | Read and print all customers | `CUSTFILE` | `CVCUS01Y` | Drop or tiny export job (debug tool) | ⬜ |
 | `CBACT04C` | `INTCALC` | Monthly interest: category balance × disclosure-group rate → interest transactions, update balances | `TCATBALF`, `XREFFILE`, `DISCGRP`, `ACCTFILE` in/out, `TRANSACT` out | `CVTRA01Y`, `CVTRA02Y`, `CVACT01Y`, `CVACT03Y`, `CVTRA05Y` | Spring Batch job `interestCalculationJob` (or `@Scheduled` monthly) | ⬜ |
 | `CBTRN01C` | — (early version) | Validate daily transactions against xref/account (no posting) | `DALYTRAN`, `CUSTFILE`, `XREFFILE`, `CARDFILE`, `ACCTFILE`, `TRANFILE` | `CVTRA06Y`, `CVCUS01Y`, `CVACT03Y`, `CVACT02Y`, `CVACT01Y`, `CVTRA05Y` | Folded into the posting job's validation step | ⬜ |
-| `CBTRN02C` | `POSTTRAN` | **Post daily transactions**: validate card/account/credit limit/expiry, write `TRANSACT`, update account + category balance, write rejects | `DALYTRAN` in; `TRANFILE`, `XREFFILE`, `ACCTFILE`, `TCATBALF` in/out; `DALYREJS` out | `CVTRA06Y`, `CVTRA05Y`, `CVACT01Y`, `CVACT03Y`, `CVTRA01Y` | Spring Batch `postTransactionsJob`: `FlatFileItemReader` (dailytran) → validating `ItemProcessor` → JPA writer; rejects via `SkipListener` | ⬜ |
+| `CBTRN02C` | `POSTTRAN` | **Post daily transactions**: validate card/account/credit limit/expiry, write `TRANSACT`, update account + category balance, write rejects | `DALYTRAN` in; `TRANFILE`, `XREFFILE`, `ACCTFILE`, `TCATBALF` in/out; `DALYREJS` out | `CVTRA06Y`, `CVTRA05Y`, `CVACT01Y`, `CVACT03Y`, `CVTRA01Y` | Spring Batch `postTransactionsJob`, run at startup: `FlatFileItemReader` (dailytran) → `PostingItemWriter` → `TransactionPostingService` (validate + post, one record at a time); rejects to a `FlatFileItemWriter` (`dalyrejs.txt`) | ✅ |
 | `CBTRN03C` | `TRANREPT` | Print transaction detail report for a date range | `TRANFILE`, `CARDXREF`, `TRANTYPE`, `TRANCATG`, `DATEPARM` in; `TRANREPT` out | `CVTRA05Y`, `CVACT03Y`, `CVTRA03Y`, `CVTRA04Y`, `CVTRA07Y` | Spring Batch report job (CSV/PDF) or `GET /reports/transactions?from=&to=` | ⬜ |
 | `CBSTM03A` | `CREASTMT` | Produce account statements (text + HTML) | `STMTFILE`, `HTMLFILE` out; reads via `CBSTM03B` | `COSTM01`, `CUSTREC`, `CVACT01Y`, `CVACT03Y` | `StatementService` + template engine (Thymeleaf) in a batch job | ⬜ |
 | `CBSTM03B` | (called by `CBSTM03A`) | File-access subroutine for statements | `TRNXFILE`, `XREFFILE`, `CUSTFILE`, `ACCTFILE` | — | Replaced by JPA repositories | ⬜ |
@@ -113,6 +113,6 @@ replaced by the JPA schema, `CardDemoDataLoader`, and normal database backups.
 2. `COTRN00C` transaction list ✅ (plus `COTRN01C` transaction view ✅)
 3. `COTRN02C` transaction add ✅
 4. `COBIL00C` bill payment ✅
-5. `CBTRN02C` batch posting job
+5. `CBTRN02C` batch posting job ✅
 
 Reasoning is in the [README](README.md#recommended-migration-order).

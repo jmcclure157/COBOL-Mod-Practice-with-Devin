@@ -42,7 +42,7 @@ class BillPaymentServiceTest {
         var result = service.payBill("2", "Y");
 
         assertThat(result.transactionId()).isEqualTo("0000000996722788");
-        assertThat(result.amountPaid()).isEqualByComparingTo("158.00");
+        assertThat(result.amountPaid()).isEqualByComparingTo("1734.97");
         assertThat(result.newBalance()).isEqualByComparingTo("0.00");
         assertThat(result.message()).isEqualTo("Payment successful.  Your Transaction ID is 0000000996722788.");
         assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("0.00");
@@ -52,7 +52,7 @@ class BillPaymentServiceTest {
         assertThat(t.getCategoryCode()).isEqualTo(2);
         assertThat(t.getSource()).isEqualTo("POS TERM");
         assertThat(t.getDescription()).isEqualTo("BILL PAYMENT - ONLINE");
-        assertThat(t.getAmount()).isEqualByComparingTo("158.00");
+        assertThat(t.getAmount()).isEqualByComparingTo("1734.97");
         assertThat(t.getCardNumber()).isEqualTo("0923877193247330");
         assertThat(t.getMerchantId()).isEqualTo(999999999L);
         assertThat(t.getMerchantName()).isEqualTo("BILL PAYMENT");
@@ -64,7 +64,7 @@ class BillPaymentServiceTest {
 
     @Test
     void lowercaseYAndPaddedAccountIdAlsoPay() {
-        assertThat(service.payBill(" 00000000002 ", "y").amountPaid()).isEqualByComparingTo("158.00");
+        assertThat(service.payBill(" 00000000002 ", "y").amountPaid()).isEqualByComparingTo("1734.97");
     }
 
     @Test
@@ -96,7 +96,7 @@ class BillPaymentServiceTest {
         for (String confirm : new String[] {null, "", " ", "N", "n"}) {
             rejected("2", confirm, BillPaymentRejectedException.class, BillPaymentService.MSG_CONFIRM);
         }
-        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("158.00");
+        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("1734.97");
     }
 
     @Test
@@ -111,7 +111,7 @@ class BillPaymentServiceTest {
     void accountWithoutACardIsNotFound() {
         cardXrefs.deleteAll(cardXrefs.findAll().stream().filter(x -> x.getAccountId() == 2L).toList());
         rejected("2", "Y", AccountNotFoundException.class, BillPaymentService.MSG_ACCOUNT_NOT_FOUND);
-        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("158.00");
+        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("1734.97");
     }
 
     @Test
@@ -122,7 +122,7 @@ class BillPaymentServiceTest {
         assertThatThrownBy(() -> service.payBill("2", "Y"))
                 .isInstanceOf(TransactionIdsExhaustedException.class)
                 .hasMessage(BillPaymentService.MSG_UNABLE_TO_ADD);
-        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("158.00");
+        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("1734.97");
     }
 
     @Test
