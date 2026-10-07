@@ -15,7 +15,7 @@ VSAM files (keyed mainframe files) become tables. Entities live in `src/main/jav
 | `CUSTDAT` | `CVCUS01Y` `CUSTOMER-RECORD` (500 B) | `custdata.txt` (50) | `Customer` | ✅ |
 | `CARDDAT` | `CVACT02Y` `CARD-RECORD` (150 B) | `carddata.txt` (50) | `Card` | ✅ |
 | `CARDXREF` / `CXACAIX` (alt. index by account) | `CVACT03Y` `CARD-XREF-RECORD` (50 B) | `cardxref.txt` (50) | `CardXref` | ✅ |
-| `TRANSACT` | `CVTRA05Y` `TRAN-RECORD` (350 B) | — (written by `CBTRN02C`) | `Transaction` | 🔸 |
+| `TRANSACT` | `CVTRA05Y` `TRAN-RECORD` (350 B) | — (written by `CBTRN02C`); seeded from `dailytran.txt` until that job is migrated | `Transaction` | ✅ |
 | `DALYTRAN` (sequential input) | `CVTRA06Y` `DALYTRAN-RECORD` | `dailytran.txt` (300) | — (batch input, see `CBTRN02C`) | — |
 | `TRANTYPE` | `CVTRA03Y` `TRAN-TYPE-RECORD` | `trantype.txt` (7) | `TransactionType` | ✅ |
 | `TRANCATG` | `CVTRA04Y` `TRAN-CAT-RECORD` | `trancatg.txt` (18) | `TransactionCategory` | ✅ |
@@ -41,7 +41,7 @@ Base path for source: `carddemo/app/cbl/`. Screens: `carddemo/app/bms/`.
 | `COCRDLIC` | CCLI | `COCRDLI` | List credit cards (paged, filter by account/card) | `CARDDAT` (browse) | `CVACT02Y` | `GET /cards?accountId=&cardNumber=&page=` | ⬜ |
 | `COCRDSLC` | CCDL | `COCRDSL` | View one card | `CARDDAT` | `CVACT02Y`, `CVCUS01Y` | `GET /cards/{cardNumber}` | ⬜ |
 | `COCRDUPC` | CCUP | `COCRDUP` | Update card (name, status, expiry) | `CARDDAT` (READ UPDATE / REWRITE) | `CVACT02Y` | `PUT /cards/{cardNumber}` | ⬜ |
-| `COTRN00C` | CT00 | `COTRN00` | List transactions (paged browse forward/back) | `TRANSACT` (STARTBR/READNEXT/READPREV) | `CVTRA05Y` | `GET /transactions?page=&startId=` → `TransactionRepository` + `Pageable` | ⬜ |
+| `COTRN00C` | CT00 | `COTRN00` | List transactions (paged browse forward/back) | `TRANSACT` (STARTBR/READNEXT/READPREV) | `CVTRA05Y` | `GET /transactions?startId=&page=` → `TransactionListService` + Spring Data `Slice` | ✅ |
 | `COTRN01C` | CT01 | `COTRN01` | View one transaction | `TRANSACT` | `CVTRA05Y` | `GET /transactions/{id}` | ⬜ |
 | `COTRN02C` | CT02 | `COTRN02` | Add a transaction (validates card/account, next id) | `TRANSACT` (write), `CARDXREF`, `CXACAIX` | `CVTRA05Y`, `CVACT01Y`, `CVACT03Y` | `POST /transactions` | ⬜ |
 | `CORPT00C` | CR00 | `CORPT00` | Request transaction report (submits batch job `TRANREPT` via internal reader) | — (writes JCL to an extrapartition TDQ, i.e. the internal reader) | `CVTRA05Y` | `POST /reports/transactions` that launches the Spring Batch job (async) | ⬜ |
@@ -110,7 +110,7 @@ replaced by the JPA schema, `CardDemoDataLoader`, and normal database backups.
 ## Recommended order
 
 1. `COACTVWC` account view ✅
-2. `COTRN00C` transaction list (needs some `TRANSACT` seed data)
+2. `COTRN00C` transaction list ✅
 3. `COTRN02C` transaction add
 4. `COBIL00C` bill payment
 5. `CBTRN02C` batch posting job

@@ -10,7 +10,8 @@ import java.math.BigDecimal;
 /**
  * Posted transaction. Source: copybook CVTRA05Y (TRAN-RECORD, 350 bytes), VSAM file TRANSACT.
  * The daily input file DALYTRAN (copybook CVTRA06Y) has the same layout and feeds the CBTRN02C posting job.
- * Stub: not seeded yet (the TRANSACT file starts empty; POSTTRAN fills it).
+ * The TRANSACT file starts empty on the mainframe (POSTTRAN fills it); until CBTRN02C is migrated the
+ * loader seeds it straight from dailytran.txt.
  */
 @Entity
 @Table(name = "transactions")
