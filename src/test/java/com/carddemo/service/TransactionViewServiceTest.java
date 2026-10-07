@@ -47,10 +47,15 @@ class TransactionViewServiceTest {
 
     @Test
     void unknownOrUnpaddedIdIsNotFound() {
-        for (String missing : new String[] {"0000000000000001", "683580", "abc"}) {
+        for (String missing : new String[] {"0000000000000001", "683580", "abc", " 0000000000683580"}) {
             assertThatThrownBy(() -> service.viewTransaction(missing))
                     .isInstanceOf(TransactionNotFoundException.class)
                     .hasMessage(TransactionViewService.MSG_TRAN_ID_NOT_FOUND);
         }
+    }
+
+    @Test
+    void trailingSpacesAreCobolPaddingAndStillMatch() {
+        assertThat(service.viewTransaction("0000000000683580  ").transactionId()).isEqualTo("0000000000683580");
     }
 }

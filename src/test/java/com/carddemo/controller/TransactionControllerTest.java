@@ -76,6 +76,13 @@ class TransactionControllerTest {
     }
 
     @Test
+    void leadingSpaceIsPartOfTheKeySoNotFound() throws Exception {
+        mvc.perform(get("/transactions/%200000000000683580"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Transaction ID NOT found..."));
+    }
+
+    @Test
     void blankTransactionIdIs400WithCobolMessage() throws Exception {
         mvc.perform(get("/transactions/{id}", " "))
                 .andExpect(status().isBadRequest())

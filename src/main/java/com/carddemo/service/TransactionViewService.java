@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Business logic of CICS program COTRN01C (transaction CT01, "View Transaction"), without the screen handling.
  * PROCESS-ENTER-KEY rejects a blank ID, then READ-TRANSACT-FILE looks the record up by its exact 16-character key.
+ * Only trailing spaces are dropped (COBOL pads short input with them); a leading space is part of the key.
  */
 @Service
 public class TransactionViewService {
@@ -23,8 +24,8 @@ public class TransactionViewService {
 
     @Transactional(readOnly = true)
     public TransactionView viewTransaction(String rawId) {
-        String id = rawId == null ? "" : rawId.strip();
-        if (id.isEmpty()) {
+        String id = rawId == null ? "" : rawId.stripTrailing();
+        if (id.isBlank()) {
             throw new InvalidTransactionIdException(MSG_TRAN_ID_EMPTY);
         }
         return transactions.findById(id)
