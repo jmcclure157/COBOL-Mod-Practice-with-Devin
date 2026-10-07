@@ -70,8 +70,11 @@ public class TransactionListService {
 
     /** POPULATE-TRAN-DATA: id, date part of TRAN-ORIG-TS, description, amount. */
     private static TransactionListItem toItem(Transaction t) {
-        String ts = t.getOriginTimestamp();
-        LocalDate date = ts == null || ts.length() < 10 ? null : LocalDate.parse(ts.substring(0, 10));
-        return new TransactionListItem(t.getId(), date, t.getDescription(), t.getAmount());
+        return new TransactionListItem(t.getId(), datePart(t.getOriginTimestamp()), t.getDescription(), t.getAmount());
+    }
+
+    /** The yyyy-MM-dd part of a TRAN-ORIG-TS / TRAN-PROC-TS timestamp, as the screens show it. */
+    static LocalDate datePart(String timestamp) {
+        return timestamp == null || timestamp.length() < 10 ? null : LocalDate.parse(timestamp.substring(0, 10));
     }
 }

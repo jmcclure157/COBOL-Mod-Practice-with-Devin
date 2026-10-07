@@ -90,6 +90,17 @@ Like the COBOL screen: 10 rows per page, sorted by transaction id, showing id, d
 and listing every transaction (the screen has no card or account filter). `hasNextPage` is the COBOL
 "read one more record to see if PF8 has anything" check.
 
+### Third migrated flow: view one transaction (`COTRN01C` → `GET /transactions/{id}`)
+
+```bash
+curl http://localhost:8080/transactions/0000000000683580   # every field of the COTRN01 screen
+curl http://localhost:8080/transactions/683580             # 404: "Transaction ID NOT found..." (key must be the full 16 characters)
+curl "http://localhost:8080/transactions/%20"              # 400: "Tran ID can NOT be empty..."
+```
+
+Like the COBOL screen, the ID is looked up exactly as typed (no zero-padding), and the two timestamps are shown as
+dates. The COBOL `READ ... UPDATE` lock is dropped: the screen never updates the record.
+
 H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC URL `jdbc:h2:mem:carddemo`, user `sa`, no password.
 
 ## Recommended migration order
@@ -97,7 +108,7 @@ H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC UR
 Each step reuses what the previous one built, and gets slightly harder:
 
 1. **Account view – `COACTVWC`** ✅ done. Read-only, three file reads, no updates. Introduces entities, seeding, REST.
-2. **Transaction list – `COTRN00C`** ✅ done → `GET /transactions?startId=&page=`. Read-only, but adds paging
+2. **Transaction list – `COTRN00C`** ✅ done → `GET /transactions?startId=&page=` (plus `COTRN01C` view ✅ → `GET /transactions/{id}`). Read-only, but adds paging
    (COBOL `STARTBR`/`READNEXT`/`READPREV` browse → Spring Data `Slice`).
 3. **Transaction add – `COTRN02C`** → `POST /transactions`. First write: input validation, cross-reference lookup,
    generating the next transaction id.

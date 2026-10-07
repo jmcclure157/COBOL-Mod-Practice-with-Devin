@@ -83,4 +83,12 @@ class TransactionListServiceTest {
                     .hasMessage(TransactionListService.MSG_PAGE_INVALID);
         }
     }
+
+    @Test
+    void rejectsPageNumbersWhoseRowOffsetWouldOverflowAnInt() {
+        assertThat(service.listTransactions(null, "214748365").transactions()).isEmpty();
+        assertThatThrownBy(() -> service.listTransactions(null, "214748366"))
+                .isInstanceOf(InvalidTransactionListRequestException.class)
+                .hasMessage(TransactionListService.MSG_PAGE_INVALID);
+    }
 }

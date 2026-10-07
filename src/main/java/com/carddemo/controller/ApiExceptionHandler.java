@@ -2,7 +2,9 @@ package com.carddemo.controller;
 
 import com.carddemo.service.AccountNotFoundException;
 import com.carddemo.service.InvalidAccountIdException;
+import com.carddemo.service.InvalidTransactionIdException;
 import com.carddemo.service.InvalidTransactionListRequestException;
+import com.carddemo.service.TransactionNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,8 +24,18 @@ public class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
+    @ExceptionHandler(InvalidTransactionIdException.class)
+    public ProblemDetail invalidTransactionId(InvalidTransactionIdException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
     @ExceptionHandler(AccountNotFoundException.class)
     public ProblemDetail accountNotFound(AccountNotFoundException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ProblemDetail transactionNotFound(TransactionNotFoundException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 }
