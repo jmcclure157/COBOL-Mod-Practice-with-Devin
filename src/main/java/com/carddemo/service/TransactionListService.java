@@ -57,7 +57,8 @@ public class TransactionListService {
         if (value.isEmpty()) {
             return 1;
         }
-        if (value.length() > MAX_PAGE_DIGITS || !isDigits(value) || Integer.parseInt(value) < 1) {
+        if (value.length() > MAX_PAGE_DIGITS || !isDigits(value) || Integer.parseInt(value) < 1
+                || (Integer.parseInt(value) - 1L) * PAGE_SIZE > Integer.MAX_VALUE) {
             throw new InvalidTransactionListRequestException(MSG_PAGE_INVALID);
         }
         return Integer.parseInt(value);
