@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -122,5 +123,29 @@ class BillPaymentServiceTest {
                 .isInstanceOf(TransactionIdsExhaustedException.class)
                 .hasMessage(BillPaymentService.MSG_UNABLE_TO_ADD);
         assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("158.00");
+    }
+
+    @Test
+    void largestBalanceThatFitsTheTransactionAmountIsPaid() {
+        setBalance(2, "999999999.99");
+        assertThat(service.payBill("2", "Y").amountPaid()).isEqualByComparingTo("999999999.99");
+    }
+
+    @Test
+    void balanceTooLargeForTheTransactionAmountIsRefusedAndKept() {
+        setBalance(2, "1000000000.00");
+        rejected("2", "Y", BillPaymentRejectedException.class, BillPaymentService.MSG_UNABLE_TO_ADD);
+        assertThat(accounts.findById(2L).orElseThrow().getCurrentBalance()).isEqualByComparingTo("1000000000.00");
+    }
+
+    @Test
+    void newIdUsesAsciiDigitsWhateverTheServerLocale() {
+        Locale original = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ar-EG"));
+            assertThat(service.payBill("2", "Y").transactionId()).isEqualTo("0000000996722788");
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 }

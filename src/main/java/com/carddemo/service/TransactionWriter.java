@@ -7,6 +7,8 @@ import jakarta.persistence.EntityManager;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
+
 /**
  * The "next id + WRITE TRANSACT" steps shared by COTRN02C (add transaction) and COBIL00C (bill payment):
  * STARTBR at HIGH-VALUES, READPREV for the highest TRAN-ID, ADD 1, then WRITE (which fails on DUPREC).
@@ -53,6 +55,6 @@ public class TransactionWriter {
         if (highest >= MAX_TRAN_ID) {
             throw new TransactionIdsExhaustedException(unableToAddMessage);
         }
-        return "%016d".formatted(highest + 1);
+        return String.format(Locale.ROOT, "%016d", highest + 1);
     }
 }

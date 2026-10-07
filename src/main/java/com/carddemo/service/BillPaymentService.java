@@ -27,6 +27,9 @@ public class BillPaymentService {
     static final String MSG_CONFIRM = "Confirm to make a bill payment...";
     static final String MSG_UNABLE_TO_ADD = "Unable to Add Bill pay Transaction...";
 
+    /** TRAN-AMT is PIC S9(09)V99, one digit shorter than ACCT-CURR-BAL PIC S9(10)V99. */
+    private static final BigDecimal MAX_TRAN_AMT = new BigDecimal("999999999.99");
+
     /** GET-CURRENT-TIMESTAMP: date, time, and the microseconds always ZEROS. */
     static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.000000");
 
@@ -64,6 +67,10 @@ public class BillPaymentService {
                 .orElseThrow(() -> new AccountNotFoundException(MSG_ACCOUNT_NOT_FOUND));
 
         BigDecimal amount = account.getCurrentBalance();
+        // COBOL's MOVE to TRAN-AMT would silently drop the top digit and leave a balance behind; refuse instead.
+        if (amount.compareTo(MAX_TRAN_AMT) > 0) {
+            throw new BillPaymentRejectedException(MSG_UNABLE_TO_ADD);
+        }
         String now = LocalDateTime.now().format(TIMESTAMP);
         var payment = new Transaction();
         payment.setTypeCode("02");
