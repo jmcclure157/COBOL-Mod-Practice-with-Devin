@@ -56,4 +56,29 @@ class TransactionControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Page must be a positive number"));
     }
+
+    @Test
+    void viewOneTransaction() throws Exception {
+        mvc.perform(get("/transactions/{id}", "0000000000683580"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionId").value("0000000000683580"))
+                .andExpect(jsonPath("$.cardNumber").value("4859452612877065"))
+                .andExpect(jsonPath("$.amount").value(504.77))
+                .andExpect(jsonPath("$.originDate").value("2022-06-10"))
+                .andExpect(jsonPath("$.merchantName").value("Abshire-Lowe"));
+    }
+
+    @Test
+    void unknownTransactionIs404WithCobolMessage() throws Exception {
+        mvc.perform(get("/transactions/{id}", "0000000000000001"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Transaction ID NOT found..."));
+    }
+
+    @Test
+    void blankTransactionIdIs400WithCobolMessage() throws Exception {
+        mvc.perform(get("/transactions/{id}", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Tran ID can NOT be empty..."));
+    }
 }

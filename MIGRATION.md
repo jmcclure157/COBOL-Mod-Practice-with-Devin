@@ -42,7 +42,7 @@ Base path for source: `carddemo/app/cbl/`. Screens: `carddemo/app/bms/`.
 | `COCRDSLC` | CCDL | `COCRDSL` | View one card | `CARDDAT` | `CVACT02Y`, `CVCUS01Y` | `GET /cards/{cardNumber}` | ⬜ |
 | `COCRDUPC` | CCUP | `COCRDUP` | Update card (name, status, expiry) | `CARDDAT` (READ UPDATE / REWRITE) | `CVACT02Y` | `PUT /cards/{cardNumber}` | ⬜ |
 | `COTRN00C` | CT00 | `COTRN00` | List transactions (paged browse forward/back) | `TRANSACT` (STARTBR/READNEXT/READPREV) | `CVTRA05Y` | `GET /transactions?startId=&page=` → `TransactionListService` + Spring Data `Slice` | ✅ |
-| `COTRN01C` | CT01 | `COTRN01` | View one transaction | `TRANSACT` | `CVTRA05Y` | `GET /transactions/{id}` | ⬜ |
+| `COTRN01C` | CT01 | `COTRN01` | View one transaction | `TRANSACT` | `CVTRA05Y` | `GET /transactions/{id}` → `TransactionViewService` | ✅ |
 | `COTRN02C` | CT02 | `COTRN02` | Add a transaction (validates card/account, next id) | `TRANSACT` (write), `CARDXREF`, `CXACAIX` | `CVTRA05Y`, `CVACT01Y`, `CVACT03Y` | `POST /transactions` | ⬜ |
 | `CORPT00C` | CR00 | `CORPT00` | Request transaction report (submits batch job `TRANREPT` via internal reader) | — (writes JCL to an extrapartition TDQ, i.e. the internal reader) | `CVTRA05Y` | `POST /reports/transactions` that launches the Spring Batch job (async) | ⬜ |
 | `COBIL00C` | CB00 | `COBIL00` | Pay full account balance: write payment transaction, zero the balance | `ACCTDAT` (update), `CXACAIX`, `TRANSACT` (write) | `CVACT01Y`, `CVACT03Y`, `CVTRA05Y` | `POST /accounts/{id}/payments` in one `@Transactional` service | ⬜ |
@@ -110,7 +110,7 @@ replaced by the JPA schema, `CardDemoDataLoader`, and normal database backups.
 ## Recommended order
 
 1. `COACTVWC` account view ✅
-2. `COTRN00C` transaction list ✅
+2. `COTRN00C` transaction list ✅ (plus `COTRN01C` transaction view ✅)
 3. `COTRN02C` transaction add
 4. `COBIL00C` bill payment
 5. `CBTRN02C` batch posting job
