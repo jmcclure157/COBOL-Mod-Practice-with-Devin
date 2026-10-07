@@ -6,6 +6,7 @@ import com.carddemo.model.CardXref;
 import com.carddemo.model.Customer;
 import com.carddemo.model.DisclosureGroup;
 import com.carddemo.model.DisclosureGroupId;
+import com.carddemo.model.Transaction;
 import com.carddemo.model.TransactionCategory;
 import com.carddemo.model.TransactionCategoryBalance;
 import com.carddemo.model.TransactionCategoryBalanceId;
@@ -18,6 +19,7 @@ import com.carddemo.repository.CustomerRepository;
 import com.carddemo.repository.DisclosureGroupRepository;
 import com.carddemo.repository.TransactionCategoryBalanceRepository;
 import com.carddemo.repository.TransactionCategoryRepository;
+import com.carddemo.repository.TransactionRepository;
 import com.carddemo.repository.TransactionTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +60,7 @@ public class CardDemoDataLoader implements ApplicationRunner {
     private final TransactionCategoryRepository transactionCategories;
     private final DisclosureGroupRepository disclosureGroups;
     private final TransactionCategoryBalanceRepository categoryBalances;
+    private final TransactionRepository transactions;
 
     public CardDemoDataLoader(ResourceLoader resourceLoader,
                               @Value("${carddemo.seed.location:classpath:carddemo-data/}") String location,
@@ -68,7 +71,8 @@ public class CardDemoDataLoader implements ApplicationRunner {
                               TransactionTypeRepository transactionTypes,
                               TransactionCategoryRepository transactionCategories,
                               DisclosureGroupRepository disclosureGroups,
-                              TransactionCategoryBalanceRepository categoryBalances) {
+                              TransactionCategoryBalanceRepository categoryBalances,
+                              TransactionRepository transactions) {
         this.resourceLoader = resourceLoader;
         this.location = location;
         this.accounts = accounts;
@@ -79,6 +83,7 @@ public class CardDemoDataLoader implements ApplicationRunner {
         this.transactionCategories = transactionCategories;
         this.disclosureGroups = disclosureGroups;
         this.categoryBalances = categoryBalances;
+        this.transactions = transactions;
     }
 
     @Override
@@ -91,6 +96,9 @@ public class CardDemoDataLoader implements ApplicationRunner {
         load("trancatg.txt", transactionCategories, CardDemoDataLoader::parseTransactionCategory);
         load("discgrp.txt", disclosureGroups, CardDemoDataLoader::parseDisclosureGroup);
         load("tcatbal.txt", categoryBalances, CardDemoDataLoader::parseCategoryBalance);
+        // Stand-in for the POSTTRAN batch job (CBTRN02C), which normally copies DALYTRAN into TRANSACT.
+        // Every daily record is loaded as-is; the job's validations arrive when CBTRN02C is migrated.
+        load("dailytran.txt", transactions, CardDemoDataLoader::parseTransaction);
     }
 
     private <T> void load(String fileName, JpaRepository<T, ?> repository, Function<String, T> parser) {
@@ -220,5 +228,25 @@ public class CardDemoDataLoader implements ApplicationRunner {
                 r.unsignedInt(4)));                      // TRANCAT-CD      PIC 9(04)
         b.setBalance(r.signedDecimal(9, 2));             // TRAN-CAT-BAL    PIC S9(09)V99
         return b;                                        // FILLER          PIC X(22)
+    }
+
+    /** CVTRA05Y TRAN-RECORD (CVTRA06Y DALYTRAN-RECORD has the same layout). */
+    static Transaction parseTransaction(String line) {
+        var r = new CopybookReader(line);
+        var t = new Transaction();
+        t.setId(r.text(16));                             // TRAN-ID            PIC X(16)
+        t.setTypeCode(r.text(2));                        // TRAN-TYPE-CD       PIC X(02)
+        t.setCategoryCode(r.unsignedInt(4));             // TRAN-CAT-CD        PIC 9(04)
+        t.setSource(r.text(10));                         // TRAN-SOURCE        PIC X(10)
+        t.setDescription(r.text(100));                   // TRAN-DESC          PIC X(100)
+        t.setAmount(r.signedDecimal(9, 2));              // TRAN-AMT           PIC S9(09)V99
+        t.setMerchantId(r.unsignedLong(9));              // TRAN-MERCHANT-ID   PIC 9(09)
+        t.setMerchantName(r.text(50));                   // TRAN-MERCHANT-NAME PIC X(50)
+        t.setMerchantCity(r.text(50));                   // TRAN-MERCHANT-CITY PIC X(50)
+        t.setMerchantZip(r.text(10));                    // TRAN-MERCHANT-ZIP  PIC X(10)
+        t.setCardNumber(r.text(16));                     // TRAN-CARD-NUM      PIC X(16)
+        t.setOriginTimestamp(r.text(26));                // TRAN-ORIG-TS       PIC X(26)
+        t.setProcessedTimestamp(r.text(26));             // TRAN-PROC-TS       PIC X(26)
+        return t;                                        // FILLER             PIC X(20)
     }
 }

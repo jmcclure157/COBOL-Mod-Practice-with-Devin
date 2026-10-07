@@ -51,9 +51,10 @@ Key design notes:
   `carddemo/app/data/ASCII`, so there is a single copy of the data.
 - **H2 in-memory database**, recreated on each start. Switch `spring.datasource.*` to PostgreSQL later if you want.
 - Seeded today: accounts, customers, cards, card cross-references, transaction types/categories,
-  disclosure groups, category balances. **Not seeded: `TRANSACT`** (posted transactions). On the mainframe that
-  file is produced by the batch posting job (`CBTRN02C`) from `dailytran.txt`; it gets filled once that job is
-  migrated. Until then the `Transaction` entity is a stub.
+  disclosure groups, category balances, and transactions.
+- **Transactions are a stand-in.** On the mainframe `TRANSACT` (posted transactions) starts empty and is filled by
+  the batch posting job (`CBTRN02C`) from `dailytran.txt`. Until that job is migrated, the loader copies all 300
+  `dailytran.txt` records straight into `TRANSACT` (same record layout, no posting validations).
 
 ## Build and run
 
@@ -76,6 +77,19 @@ curl http://localhost:8080/accounts/99999999999     # 404: "Account:99999999999 
 Same lookup order as the COBOL program: cross-reference (to find the customer) → account master → customer master.
 Error messages are the original COBOL screen messages, returned as `ProblemDetail` JSON.
 
+### Second migrated flow: transaction list (`COTRN00C` → `GET /transactions`)
+
+```bash
+curl http://localhost:8080/transactions                       # page 1: first 10 transactions in id order
+curl "http://localhost:8080/transactions?page=2"              # PF8 (next page); page=1 is back to the top
+curl "http://localhost:8080/transactions?startId=25430891"    # the screen's "Search Tran ID" field
+curl "http://localhost:8080/transactions?startId=abc"         # 400: "Tran ID must be Numeric ..."
+```
+
+Like the COBOL screen: 10 rows per page, sorted by transaction id, showing id, date, description and amount,
+and listing every transaction (the screen has no card or account filter). `hasNextPage` is the COBOL
+"read one more record to see if PF8 has anything" check.
+
 H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC URL `jdbc:h2:mem:carddemo`, user `sa`, no password.
 
 ## Recommended migration order
@@ -83,8 +97,8 @@ H2 console (browse the seeded tables): http://localhost:8080/h2-console, JDBC UR
 Each step reuses what the previous one built, and gets slightly harder:
 
 1. **Account view – `COACTVWC`** ✅ done. Read-only, three file reads, no updates. Introduces entities, seeding, REST.
-2. **Transaction list – `COTRN00C`** → `GET /transactions?cardNumber=&page=`. Read-only, but adds paging
-   (COBOL `STARTBR`/`READNEXT`/`READPREV` browse → Spring Data `Pageable`). Needs some `TRANSACT` data seeded first.
+2. **Transaction list – `COTRN00C`** ✅ done → `GET /transactions?startId=&page=`. Read-only, but adds paging
+   (COBOL `STARTBR`/`READNEXT`/`READPREV` browse → Spring Data `Slice`).
 3. **Transaction add – `COTRN02C`** → `POST /transactions`. First write: input validation, cross-reference lookup,
    generating the next transaction id.
 4. **Bill payment – `COBIL00C`** → `POST /accounts/{id}/payments`. Updates two records (writes a transaction and

@@ -7,6 +7,7 @@ import com.carddemo.repository.CustomerRepository;
 import com.carddemo.repository.DisclosureGroupRepository;
 import com.carddemo.repository.TransactionCategoryBalanceRepository;
 import com.carddemo.repository.TransactionCategoryRepository;
+import com.carddemo.repository.TransactionRepository;
 import com.carddemo.repository.TransactionTypeRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ class CardDemoDataLoaderTest {
     @Autowired TransactionCategoryRepository transactionCategories;
     @Autowired DisclosureGroupRepository disclosureGroups;
     @Autowired TransactionCategoryBalanceRepository categoryBalances;
+    @Autowired TransactionRepository transactions;
 
     @Test
     void seedsEveryRecordFromTheSampleFiles() {
@@ -39,6 +41,22 @@ class CardDemoDataLoaderTest {
         assertThat(transactionCategories.count()).isEqualTo(18);
         assertThat(disclosureGroups.count()).isEqualTo(51);
         assertThat(categoryBalances.count()).isEqualTo(50);
+        assertThat(transactions.count()).isEqualTo(300);
+    }
+
+    @Test
+    void parsesDailyTransactionsIncludingNegativeAmounts() {
+        var purchase = transactions.findById("0000000000683580").orElseThrow();
+        assertThat(purchase.getDescription()).isEqualTo("Purchase at Abshire-Lowe");
+        assertThat(purchase.getAmount()).isEqualByComparingTo(new BigDecimal("504.77"));   // 0000005047G
+        assertThat(purchase.getCardNumber()).isEqualTo("4859452612877065");
+        assertThat(purchase.getOriginTimestamp()).isEqualTo("2022-06-10 19:27:53.000000");
+
+        var refund = transactions.findById("0000000001774260").orElseThrow();
+        assertThat(refund.getAmount()).isEqualByComparingTo(new BigDecimal("-919.00"));    // 0000009190}
+
+        var otherRefund = transactions.findById("0000000016259484").orElseThrow();
+        assertThat(otherRefund.getAmount()).isEqualByComparingTo(new BigDecimal("-56.77")); // 0000000567P
     }
 
     @Test
