@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,8 +42,21 @@ class CardDemoDataLoaderTest {
         assertThat(transactionTypes.count()).isEqualTo(7);
         assertThat(transactionCategories.count()).isEqualTo(18);
         assertThat(disclosureGroups.count()).isEqualTo(51);
-        assertThat(categoryBalances.count()).isEqualTo(50);
-        assertThat(transactions.count()).isEqualTo(300);
+        assertThat(categoryBalances.count()).isEqualTo(100);
+        assertThat(transactions.count()).isEqualTo(262);
+    }
+
+    @Test
+    void postingJobRejectsTheOverLimitDailyRecords() throws Exception {
+        assertThat(transactions.findById("0000000040455859")).isEmpty();
+
+        var rejects = Files.readAllLines(Path.of("target/dalyrejs.txt"));
+        assertThat(rejects).hasSize(38);
+        assertThat(rejects).allSatisfy(r -> {
+            assertThat(r).hasSize(430);
+            assertThat(r.substring(350).stripTrailing()).isEqualTo("0102OVERLIMIT TRANSACTION");
+        });
+        assertThat(rejects.get(0)).startsWith("0000000040455859");
     }
 
     @Test
@@ -63,7 +78,7 @@ class CardDemoDataLoaderTest {
     void parsesAccountOneLikeTheCopybookSays() {
         var account = accounts.findById(1L).orElseThrow();
         assertThat(account.getActiveStatus()).isEqualTo("Y");
-        assertThat(account.getCurrentBalance()).isEqualByComparingTo(new BigDecimal("194.00"));
+        assertThat(account.getCurrentBalance()).isEqualByComparingTo(new BigDecimal("1288.10"));
         assertThat(account.getCreditLimit()).isEqualByComparingTo(new BigDecimal("2020.00"));
         assertThat(account.getCashCreditLimit()).isEqualByComparingTo(new BigDecimal("1020.00"));
         assertThat(account.getOpenDate()).isEqualTo(LocalDate.of(2014, 11, 20));

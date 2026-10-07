@@ -23,7 +23,7 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountId").value(1))
                 .andExpect(jsonPath("$.activeStatus").value("Y"))
-                .andExpect(jsonPath("$.currentBalance").value(194.00))
+                .andExpect(jsonPath("$.currentBalance").value(1288.10))
                 .andExpect(jsonPath("$.creditLimit").value(2020.00))
                 .andExpect(jsonPath("$.openDate").value("2014-11-20"))
                 .andExpect(jsonPath("$.customer.customerId").value(1))

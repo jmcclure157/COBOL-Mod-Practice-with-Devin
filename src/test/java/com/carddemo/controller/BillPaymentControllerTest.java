@@ -28,7 +28,7 @@ class BillPaymentControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/transactions/0000000996722788"))
                 .andExpect(jsonPath("$.transactionId").value("0000000996722788"))
-                .andExpect(jsonPath("$.amountPaid").value(158.00))
+                .andExpect(jsonPath("$.amountPaid").value(1734.97))
                 .andExpect(jsonPath("$.newBalance").value(0))
                 .andExpect(jsonPath("$.message").value("Payment successful.  Your Transaction ID is 0000000996722788."));
 
@@ -36,7 +36,7 @@ class BillPaymentControllerTest {
         mvc.perform(get("/transactions/0000000996722788"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("BILL PAYMENT - ONLINE"))
-                .andExpect(jsonPath("$.amount").value(158.00));
+                .andExpect(jsonPath("$.amount").value(1734.97));
     }
 
     @Test

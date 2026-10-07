@@ -31,12 +31,12 @@ class TransactionListServiceTest {
 
     @Test
     void lastPageHasNoNextPageAndPastTheEndIsEmpty() {
-        var last = service.listTransactions(null, "30");
+        var last = service.listTransactions(null, "27");
         assertThat(last.hasNextPage()).isFalse();
-        assertThat(last.transactions()).hasSize(10);
-        assertThat(last.transactions().get(9).transactionId()).isEqualTo("0000000996722787");
+        assertThat(last.transactions()).hasSize(2);
+        assertThat(last.transactions().get(1).transactionId()).isEqualTo("0000000996722787");
 
-        var pastEnd = service.listTransactions(null, "31");
+        var pastEnd = service.listTransactions(null, "28");
         assertThat(pastEnd.hasNextPage()).isFalse();
         assertThat(pastEnd.transactions()).isEmpty();
     }
